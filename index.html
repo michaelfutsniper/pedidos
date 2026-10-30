@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Pedido de Coins</title>
+<style>
+  /* ====== CONFIGURE AQUI ====== */
+  :root { --cor: #22c55e; }
+</style>
+<script>
+  const CONFIG = {
+    NOME_LOJA: "MICHAEL TRANSFERS",                       // nome que aparece no topo
+    API: "https://coins-pedidos.michaeloumaicon2.workers.dev",    // URL do seu Cloudflare Worker
+    WHATSAPP: "",                                         // opcional, ex: "5511999999999"
+  };
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #0b0f14; color: #e6edf3; min-height: 100vh;
+    display: flex; justify-content: center; padding: 20px 14px 40px;
+  }
+  .wrap { width: 100%; max-width: 440px; }
+  header { text-align: center; margin-bottom: 18px; }
+  header h1 { font-size: 22px; letter-spacing: .5px; }
+  header p { color: #8b98a5; font-size: 14px; margin-top: 4px; }
+
+  .estoque {
+    background: linear-gradient(135deg, #0f1a12, #0d1520);
+    border: 1px solid #1f3a29; border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .estoque .lbl { font-size: 13px; color: #8b98a5; }
+  .estoque .val { font-size: 26px; font-weight: 800; color: var(--cor); }
+  .estoque .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cor);
+    display: inline-block; margin-right: 6px; box-shadow: 0 0 8px var(--cor); animation: p 2s infinite; }
+  .estoque .at { font-size: 11px; color: #5c6773; margin-top: 2px; }
+  @keyframes p { 50% { opacity: .35; } }
+
+  form { background: #121821; border: 1px solid #1f2933; border-radius: 16px; padding: 18px; }
+  label { display: block; font-size: 13px; color: #9fb0c0; margin: 14px 0 6px; font-weight: 600; }
+  form > label:first-child { margin-top: 0; }
+  input[type=text], input[type=email], input[type=password] {
+    width: 100%; padding: 13px 14px; border-radius: 10px; font-size: 16px;
+    background: #0b0f14; border: 1px solid #2a3542; color: #e6edf3; outline: none;
+  }
+  input:focus { border-color: var(--cor); }
+  .pw { position: relative; }
+  .pw button { position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: none; border: 0; color: #8b98a5; font-size: 13px; cursor: pointer; padding: 6px; }
+
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .seg input { display: none; }
+  .seg label { margin: 0; text-align: center; padding: 12px 8px; border-radius: 10px;
+    background: #0b0f14; border: 1px solid #2a3542; color: #c9d4de; cursor: pointer; font-size: 14px; }
+  .seg input:checked + label { border-color: var(--cor); background: #10241a; color: #fff; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chips button { background: #1a2330; border: 1px solid #2a3542; color: #c9d4de;
+    padding: 7px 12px; border-radius: 999px; font-size: 13px; cursor: pointer; }
+  .chips button:hover { border-color: var(--cor); }
+
+  .hint { font-size: 12px; color: #6b7785; margin-top: 6px; line-height: 1.4; }
+  .warn { color: #f5b041; }
+  .hide { display: none !important; }
+  .hp { position: absolute; left: -9999px; }
+
+  .enviar { width: 100%; margin-top: 20px; padding: 15px; border: 0; border-radius: 12px;
+    background: var(--cor); color: #04130a; font-size: 16px; font-weight: 800; cursor: pointer; }
+  .enviar:disabled { opacity: .55; cursor: wait; }
+  .msg { margin-top: 12px; font-size: 14px; text-align: center; }
+  .msg.err { color: #ff6b6b; }
+
+  .ok { text-align: center; background: #121821; border: 1px solid #1f3a29;
+    border-radius: 16px; padding: 30px 20px; }
+  .ok .big { font-size: 46px; }
+  .ok h2 { margin: 8px 0 6px; }
+  .ok p { color: #9fb0c0; font-size: 14px; line-height: 1.5; }
+  .ok a, .ok button { display: inline-block; margin-top: 16px; color: var(--cor);
+    background: none; border: 1px solid var(--cor); padding: 10px 16px; border-radius: 10px;
+    text-decoration: none; cursor: pointer; font-size: 14px; }
+
+  footer { text-align: center; font-size: 12px; color: #4f5b67; margin-top: 18px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="nomeLoja">⚽ Pedido de Coins</h1>
+    <p>Preencha os dados da sua conta para receber as coins</p>
+  </header>
+
+  <div class="estoque hide" id="boxEstoque">
+    <div>
+      <div class="lbl"><span class="dot"></span>Disponível agora</div>
+      <div class="at" id="estAt"></div>
+    </div>
+    <div class="val" id="estVal">—</div>
+  </div>
+
+  <form id="f" autocomplete="off">
+    <label>Plataforma</label>
+    <div class="seg">
+      <input type="radio" name="plataforma" id="p1" value="CONSOLE" required><label for="p1">🎮 Console</label>
+      <input type="radio" name="plataforma" id="p2" value="PC"><label for="p2">💻 PC</label>
+    </div>
+
+    <label for="quantidade">Quantidade de coins</label>
+    <input type="text" id="quantidade" name="quantidade" placeholder="Ex: 1M, 500K" required inputmode="text">
+    <div class="chips" id="chips">
+      <button type="button" data-v="500K">500K</button>
+      <button type="button" data-v="1M">1M</button>
+      <button type="button" data-v="2M">2M</button>
+      <button type="button" data-v="3M">3M</button>
+      <button type="button" data-v="5M">5M</button>
+    </div>
+    <div class="hint warn hide" id="avisoQtd"></div>
+
+    <label for="email">Email da conta EA</label>
+    <input type="email" id="email" name="email" placeholder="seuemail@exemplo.com" required autocapitalize="off">
+
+    <label for="senha">Senha da conta EA</label>
+    <div class="pw">
+      <input type="password" id="senha" name="senha" required autocomplete="new-password">
+      <button type="button" id="verSenha">mostrar</button>
+    </div>
+
+    <label>Como vamos logar?</label>
+    <div class="seg">
+      <input type="radio" name="login" id="l1" value="backup" checked><label for="l1">🛡 Códigos de backup</label>
+      <input type="radio" name="login" id="l2" value="codigo"><label for="l2">📲 Passo o código na hora</label>
+    </div>
+
+    <div id="boxBackup">
+      <label for="backup">Códigos de backup</label>
+      <input type="text" id="backup" name="backup" placeholder="Ex: 12345678 87654321" inputmode="numeric">
+      <div class="hint">Cada código funciona só uma vez — mande 2 ou 3 se puder.</div>
+    </div>
+    <div id="boxCodigo" class="hide">
+      <div class="hint">Vou te chamar no WhatsApp na hora de logar pra você passar o código que chegar no seu email.</div>
+    </div>
+
+    <label for="contato">Seu nome ou WhatsApp <span style="font-weight:400;color:#6b7785">(opcional)</span></label>
+    <input type="text" id="contato" name="contato" placeholder="Ex: João · 11 99999-9999">
+
+    <input type="text" name="site" class="hp" tabindex="-1" autocomplete="off">
+
+    <button class="enviar" id="btn" type="submit">Enviar pedido</button>
+    <div class="msg" id="msg"></div>
+  </form>
+
+  <div class="ok hide" id="ok">
+    <div class="big">✅</div>
+    <h2>Pedido recebido!</h2>
+    <p>Já fui avisado e vou começar a transferência.<br>
+       <b>Não entre na conta</b> enquanto a transferência estiver rolando.<br>
+       Depois de concluído, se quiser, troque sua senha.</p>
+    <a id="zap" class="hide" target="_blank" rel="noopener">Falar no WhatsApp</a>
+    <br><button type="button" id="novo">Fazer outro pedido</button>
+  </div>
+
+  <footer>Seus dados vão direto pra mim e não ficam salvos em nenhum banco de dados.</footer>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  $("nomeLoja").textContent = "⚽ " + CONFIG.NOME_LOJA;
+  document.title = CONFIG.NOME_LOJA + " — Pedido";
+
+  let estoqueAtual = null;
+
+  function parseCoins(v) {
+    const s = String(v || "").trim().toUpperCase().replace(/\s/g, "").replace(",", ".");
+    const m = s.match(/^(\d+(?:\.\d+)?)(K|M)?$/);
+    if (!m) return null;
+    return Math.round(parseFloat(m[1]) * (m[2] === "M" ? 1e6 : m[2] === "K" ? 1e3 : 1));
+  }
+
+  async function carregarEstoque() {
+    try {
+      const r = await fetch(CONFIG.API + "/estoque", { cache: "no-store" });
+      const d = await r.json();
+      if (d.coins === null) { $("boxEstoque").classList.add("hide"); estoqueAtual = null; return; }
+      estoqueAtual = d.coins;
+      $("estVal").textContent = d.texto;
+      if (d.atualizado) {
+        const t = new Date(d.atualizado);
+        $("estAt").textContent = "atualizado " + t.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      }
+      $("boxEstoque").classList.remove("hide");
+      checarQtd();
+    } catch (e) { /* sem estoque, segue a vida */ }
+  }
+
+  function checarQtd() {
+    const q = parseCoins($("quantidade").value);
+    const a = $("avisoQtd");
+    if ($("quantidade").value && q === null) {
+      a.textContent = "Use o formato 1M, 500K ou 1000000."; a.classList.remove("hide");
+    } else if (q && estoqueAtual !== null && q > estoqueAtual) {
+      a.textContent = "Acima do disponível agora (" + $("estVal").textContent + "). Pode enviar, mas pode demorar mais."; a.classList.remove("hide");
+    } else a.classList.add("hide");
+  }
+
+  $("quantidade").addEventListener("input", checarQtd);
+  $("chips").addEventListener("click", (e) => {
+    if (e.target.dataset.v) { $("quantidade").value = e.target.dataset.v; checarQtd(); }
+  });
+  $("verSenha").onclick = () => {
+    const s = $("senha"); const show = s.type === "password";
+    s.type = show ? "text" : "password"; $("verSenha").textContent = show ? "esconder" : "mostrar";
+  };
+  document.querySelectorAll("input[name=login]").forEach((r) => r.addEventListener("change", () => {
+    const codigo = document.querySelector("input[name=login]:checked").value === "codigo";
+    $("boxBackup").classList.toggle("hide", codigo);
+    $("boxCodigo").classList.toggle("hide", !codigo);
+  }));
+
+  $("f").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData($("f"));
+    const dados = Object.fromEntries(fd.entries());
+    const msg = $("msg"); msg.className = "msg"; msg.textContent = "";
+
+    if (!dados.plataforma) { msg.className = "msg err"; msg.textContent = "Escolha Console ou PC."; return; }
+    if (!parseCoins(dados.quantidade)) { msg.className = "msg err"; msg.textContent = "Quantidade inválida (ex: 1M)."; return; }
+    if (dados.login === "backup" && !dados.backup.trim()) { msg.className = "msg err"; msg.textContent = "Informe os códigos de backup ou escolha passar o código na hora."; return; }
+
+    $("btn").disabled = true; $("btn").textContent = "Enviando...";
+    try {
+      const r = await fetch(CONFIG.API + "/pedido", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(dados),
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.erro || "Erro ao enviar.");
+      $("f").reset(); $("f").classList.add("hide"); $("ok").classList.remove("hide");
+      if (CONFIG.WHATSAPP) { $("zap").href = "https://wa.me/" + CONFIG.WHATSAPP; $("zap").classList.remove("hide"); }
+    } catch (err) {
+      msg.className = "msg err"; msg.textContent = err.message || "Erro ao enviar. Tente de novo.";
+    } finally {
+      $("btn").disabled = false; $("btn").textContent = "Enviar pedido";
+    }
+  });
+
+  $("novo").onclick = () => {
+    $("ok").classList.add("hide"); $("f").classList.remove("hide");
+    $("boxBackup").classList.remove("hide"); $("boxCodigo").classList.add("hide");
+    carregarEstoque();
+  };
+
+  carregarEstoque();
+  setInterval(carregarEstoque, 60000);
+</script>
+</body>
+</html>
