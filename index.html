@@ -31,14 +31,18 @@
   .estoque {
     background: linear-gradient(135deg, #0f1a12, #0d1520);
     border: 1px solid #1f3a29; border-radius: 14px;
-    padding: 14px 16px; margin-bottom: 16px;
-    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px 14px; margin-bottom: 16px;
   }
-  .estoque .lbl { font-size: 13px; color: #8b98a5; }
-  .estoque .val { font-size: 26px; font-weight: 800; color: var(--cor); }
+  .estoque .lbl { font-size: 13px; color: #8b98a5; margin-bottom: 10px; }
+  .estoque .at { font-size: 11px; color: #5c6773; margin-left: 4px; }
   .estoque .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cor);
     display: inline-block; margin-right: 6px; box-shadow: 0 0 8px var(--cor); animation: p 2s infinite; }
-  .estoque .at { font-size: 11px; color: #5c6773; margin-top: 2px; }
+  .plats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .plat { background: #0b0f14; border: 1px solid #1f2933; border-radius: 10px; padding: 10px 12px; transition: border-color .2s; }
+  .plat.sel { border-color: var(--cor); }
+  .plat.off { opacity: .45; }
+  .plat .pn { font-size: 12px; color: #9fb0c0; }
+  .plat .val { font-size: 24px; font-weight: 800; color: var(--cor); margin-top: 2px; }
   @keyframes p { 50% { opacity: .35; } }
 
   form { background: #121821; border: 1px solid #1f2933; border-radius: 16px; padding: 18px; }
@@ -95,11 +99,11 @@
   </header>
 
   <div class="estoque hide" id="boxEstoque">
-    <div>
-      <div class="lbl"><span class="dot"></span>Disponível agora</div>
-      <div class="at" id="estAt"></div>
+    <div class="lbl"><span class="dot"></span>Disponível agora <span class="at" id="estAt"></span></div>
+    <div class="plats">
+      <div class="plat" id="estC"><div class="pn">🎮 Console</div><div class="val" id="valC">—</div></div>
+      <div class="plat" id="estP"><div class="pn">💻 PC</div><div class="val" id="valP">—</div></div>
     </div>
-    <div class="val" id="estVal">—</div>
   </div>
 
   <form id="f" autocomplete="off">
@@ -171,7 +175,7 @@
   $("nomeLoja").textContent = "⚽ " + CONFIG.NOME_LOJA;
   document.title = CONFIG.NOME_LOJA + " — Pedido";
 
-  let estoqueAtual = null;
+  let estoque = { CONSOLE: null, PC: null };
 
   function parseCoins(v) {
     const s = String(v || "").trim().toUpperCase().replace(/\s/g, "").replace(",", ".");
@@ -184,28 +188,42 @@
     try {
       const r = await fetch(CONFIG.API + "/estoque", { cache: "no-store" });
       const d = await r.json();
-      if (d.coins === null) { $("boxEstoque").classList.add("hide"); estoqueAtual = null; return; }
-      estoqueAtual = d.coins;
-      $("estVal").textContent = d.texto;
+      estoque = { CONSOLE: d.CONSOLE ? d.CONSOLE.coins : null, PC: d.PC ? d.PC.coins : null };
+      if (estoque.CONSOLE === null && estoque.PC === null) { $("boxEstoque").classList.add("hide"); return; }
+      $("valC").textContent = estoque.CONSOLE === null ? "—" : d.CONSOLE.texto;
+      $("valP").textContent = estoque.PC === null ? "—" : d.PC.texto;
+      $("estC").classList.toggle("off", estoque.CONSOLE === null || estoque.CONSOLE === 0);
+      $("estP").classList.toggle("off", estoque.PC === null || estoque.PC === 0);
       if (d.atualizado) {
         const t = new Date(d.atualizado);
-        $("estAt").textContent = "atualizado " + t.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+        $("estAt").textContent = "· atualizado " + t.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
       }
       $("boxEstoque").classList.remove("hide");
       checarQtd();
     } catch (e) { /* sem estoque, segue a vida */ }
   }
 
+  function platSel() {
+    const r = document.querySelector("input[name=plataforma]:checked");
+    return r ? r.value : null;
+  }
+
   function checarQtd() {
     const q = parseCoins($("quantidade").value);
+    const plat = platSel();
+    const disp = plat ? estoque[plat] : null;
+    $("estC").classList.toggle("sel", plat === "CONSOLE");
+    $("estP").classList.toggle("sel", plat === "PC");
     const a = $("avisoQtd");
     if ($("quantidade").value && q === null) {
       a.textContent = "Use o formato 1M, 500K ou 1000000."; a.classList.remove("hide");
-    } else if (q && estoqueAtual !== null && q > estoqueAtual) {
-      a.textContent = "Acima do disponível agora (" + $("estVal").textContent + "). Pode enviar, mas pode demorar mais."; a.classList.remove("hide");
+    } else if (q && disp !== null && q > disp) {
+      const nome = plat === "PC" ? "PC" : "Console";
+      a.textContent = "Acima do disponível pra " + nome + " agora. Pode enviar, mas pode demorar mais."; a.classList.remove("hide");
     } else a.classList.add("hide");
   }
 
+  document.querySelectorAll("input[name=plataforma]").forEach((r) => r.addEventListener("change", checarQtd));
   $("quantidade").addEventListener("input", checarQtd);
   $("chips").addEventListener("click", (e) => {
     if (e.target.dataset.v) { $("quantidade").value = e.target.dataset.v; checarQtd(); }
